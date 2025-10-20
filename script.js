@@ -3,11 +3,28 @@ const addWindowBtn = document.getElementById('add-window-btn');
 
 let windows = [];
 let windowCounter = 0;
+let gapPercentX = 0;
+let gapPercentY = 0;
 
 const colors = [
     '#f7768e', '#7aa2f7', '#9ece6a', '#e0af68', '#bb9af7', 
     '#7dcfff', '#ff9e64', '#db4b4b'
 ];
+
+function calculateGapPercentages() {
+    const style = getComputedStyle(document.documentElement);
+    const gapPx = parseFloat(style.getPropertyValue('--gap')) || 0;
+
+    const workspaceWidth = workspace.clientWidth;
+    const workspaceHeight = workspace.clientHeight;
+
+    if (workspaceWidth > 0) {
+        gapPercentX = (gapPx / workspaceWidth) * 100;
+    }
+    if (workspaceHeight > 0) {
+        gapPercentY = (gapPx / workspaceHeight) * 100;
+    }
+}
 
 function createWindowElement() {
     const windowEl = document.createElement('div');
@@ -85,21 +102,48 @@ function addNewWindow() {
 }
 
 function splitVertically(windowToSplit, newWindow) {
-    newWindow.width = windowToSplit.width / 2;
+    const originalWidth = windowToSplit.width;
+    const newWidth = (originalWidth - gapPercentX) / 2;
+
+    if (newWidth < 1) { // Prevents creating windows that are too small
+        return false;
+    }
+
+    windowToSplit.width = newWidth;
+
+    newWindow.width = newWidth;
     newWindow.height = windowToSplit.height;
-    newWindow.x = windowToSplit.x + windowToSplit.width / 2;
+    newWindow.x = windowToSplit.x + newWidth + gapPercentX;
     newWindow.y = windowToSplit.y;
-    windowToSplit.width /= 2;
+    return true;
 }
 
 function splitHorizontally(windowToSplit, newWindow) {
+    const originalHeight = windowToSplit.height;
+    const newHeight = (originalHeight - gapPercentY) / 2;
+
+    if (newHeight < 1) { // Prevents creating windows that are too small
+        return false;
+    }
+
+    windowToSplit.height = newHeight;
+
     newWindow.width = windowToSplit.width;
-    newWindow.height = windowToSplit.height / 2;
+    newWindow.height = newHeight;
     newWindow.x = windowToSplit.x;
-    newWindow.y = windowToSplit.y + windowToSplit.height / 2;
-    windowToSplit.height /= 2;
+    newWindow.y = windowToSplit.y + newHeight + gapPercentY;
+    return true;
 }
 
 document.body.addEventListener('click', addNewWindow);
-// Add the first window automatically
+
+// Initial setup
+calculateGapPercentages();
 addNewWindow();
+
+// Recalculate on resize to keep gaps consistent
+const resizeObserver = new ResizeObserver(() => {
+    calculateGapPercentages();
+    updateWindowLayout();
+});
+resizeObserver.observe(workspace);
