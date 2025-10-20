@@ -1,15 +1,25 @@
 const workspace = document.getElementById('workspace');
-const addWindowBtn = document.getElementById('add-window-btn');
+const themeSwitcher = document.getElementById('theme-switcher');
+
+const themes = ['tokyo-night', 'catppuccin', 'gruvbox', 'rose-pine'];
+let currentThemeIndex = 0;
+
+function applyTheme() {
+    document.body.dataset.theme = themes[currentThemeIndex];
+}
+
+themeSwitcher.addEventListener('click', () => {
+    currentThemeIndex = (currentThemeIndex + 1) % themes.length;
+    applyTheme();
+});
+
+// Set initial theme
+applyTheme();
 
 let windows = [];
 let windowCounter = 0;
 let gapPercentX = 0;
 let gapPercentY = 0;
-
-const colors = [
-    '#f7768e', '#7aa2f7', '#9ece6a', '#e0af68', '#bb9af7', 
-    '#7dcfff', '#ff9e64', '#db4b4b'
-];
 
 function calculateGapPercentages() {
     const style = getComputedStyle(document.documentElement);
@@ -30,7 +40,7 @@ function createWindowElement() {
     const windowEl = document.createElement('div');
     windowEl.className = 'window new';
     windowEl.textContent = ++windowCounter;
-    windowEl.style.borderColor = colors[windowCounter % colors.length];
+    windowEl.classList.add(`color-${(windowCounter % 8) + 1}`);
     workspace.appendChild(windowEl);
     return windowEl;
 }
