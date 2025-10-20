@@ -28,7 +28,7 @@ function calculateGapPercentages() {
 
 function createWindowElement() {
     const windowEl = document.createElement('div');
-    windowEl.className = 'window';
+    windowEl.className = 'window new';
     windowEl.textContent = ++windowCounter;
     windowEl.style.borderColor = colors[windowCounter % colors.length];
     workspace.appendChild(windowEl);
@@ -37,10 +37,17 @@ function createWindowElement() {
 
 function updateWindowLayout() {
     windows.forEach(win => {
-        win.element.style.top = `${win.y}%`;
-        win.element.style.left = `${win.x}%`;
-        win.element.style.width = `${win.width}%`;
-        win.element.style.height = `${win.height}%`;
+        const el = win.element;
+        if (el.classList.contains('new')) {
+            const delay = windows.length > 1 ? 150 : 0;
+            setTimeout(() => {
+                el.classList.remove('new');
+            }, delay);
+        }
+        el.style.top = `${win.y}%`;
+        el.style.left = `${win.x}%`;
+        el.style.width = `${win.width}%`;
+        el.style.height = `${win.height}%`;
     });
 }
 
@@ -62,8 +69,7 @@ function addNewWindow() {
         if (windows.length >= 4) {
             const minSplitCount = Math.min(...windows.map(w => w.splitCount));
             const candidateWindows = windows.filter(w => w.splitCount === minSplitCount);
-            const randomIndex = Math.floor(Math.random() * candidateWindows.length);
-            windowToSplit = candidateWindows[randomIndex];
+            windowToSplit = candidateWindows[Math.floor(Math.random() * candidateWindows.length)];
         } else {
             windowToSplit = windows.reduce((largest, current) => {
                 return (current.width * current.height > largest.width * largest.height) ? current : largest;
@@ -71,31 +77,29 @@ function addNewWindow() {
         }
         
         const newWindowEl = createWindowElement();
-        windowToSplit.splitCount++;
-        
         const newWindow = {
             id: windowCounter,
             element: newWindowEl,
-            splitCount: windowToSplit.splitCount,
+            splitCount: 0,
         };
 
-        // Decide split direction based on the number of windows
-        if (windows.length >= 4) {
-            // After 4 windows, prefer vertical splits.
-            // Split vertically unless the window is substantially taller than it is wide.
-            if (windowToSplit.width > windowToSplit.height * 0.75) { 
-                splitVertically(windowToSplit, newWindow);
-            } else { // Split horizontally
-                splitHorizontally(windowToSplit, newWindow);
-            }
+        let splitSuccess = false;
+        const splitPreference = (windowToSplit.width > windowToSplit.height * 0.75);
+        
+        if (windows.length >= 4 ? splitPreference : (windowToSplit.width > windowToSplit.height)) {
+            splitSuccess = splitVertically(windowToSplit, newWindow);
         } else {
-            // Original logic for less than 4 windows
-            if (windowToSplit.width > windowToSplit.height) { // Split vertically
-                splitVertically(windowToSplit, newWindow);
-            } else { // Split horizontally
-                splitHorizontally(windowToSplit, newWindow);
-            }
+            splitSuccess = splitHorizontally(windowToSplit, newWindow);
         }
+
+        if (!splitSuccess) {
+            windowCounter--;
+            workspace.removeChild(newWindowEl);
+            return;
+        }
+
+        windowToSplit.splitCount++;
+        newWindow.splitCount = windowToSplit.splitCount;
         windows.push(newWindow);
     }
     updateWindowLayout();
@@ -105,12 +109,9 @@ function splitVertically(windowToSplit, newWindow) {
     const originalWidth = windowToSplit.width;
     const newWidth = (originalWidth - gapPercentX) / 2;
 
-    if (newWidth < 1) { // Prevents creating windows that are too small
-        return false;
-    }
+    if (newWidth < 1) return false;
 
     windowToSplit.width = newWidth;
-
     newWindow.width = newWidth;
     newWindow.height = windowToSplit.height;
     newWindow.x = windowToSplit.x + newWidth + gapPercentX;
@@ -122,12 +123,9 @@ function splitHorizontally(windowToSplit, newWindow) {
     const originalHeight = windowToSplit.height;
     const newHeight = (originalHeight - gapPercentY) / 2;
 
-    if (newHeight < 1) { // Prevents creating windows that are too small
-        return false;
-    }
+    if (newHeight < 1) return false;
 
     windowToSplit.height = newHeight;
-
     newWindow.width = windowToSplit.width;
     newWindow.height = newHeight;
     newWindow.x = windowToSplit.x;
@@ -137,11 +135,9 @@ function splitHorizontally(windowToSplit, newWindow) {
 
 document.body.addEventListener('click', addNewWindow);
 
-// Initial setup
 calculateGapPercentages();
 addNewWindow();
 
-// Recalculate on resize to keep gaps consistent
 const resizeObserver = new ResizeObserver(() => {
     calculateGapPercentages();
     updateWindowLayout();
