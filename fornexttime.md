@@ -1,0 +1,1 @@
+Add a basic x svg to the top right of every window and make sure the closing animation is just as nice. unfortunately you won't just be able to undo the transformation of whatever was open before this. I need a full proof and technically comprehensive solution to ensure that the page is always filled as evenly as possible
