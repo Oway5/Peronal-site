@@ -263,7 +263,9 @@ function addNewWindow() {
     } else {
         const targetLeaf = selectLeafToSplit();
         if (targetLeaf) {
-            const orientation = determineSplitOrientation(targetLeaf);
+            const orientation = windowsById.size === 1
+                ? 'vertical'
+                : determineSplitOrientation(targetLeaf);
             splitLeaf(targetLeaf, newLeaf, orientation);
         } else {
             layoutRoot = newLeaf;
