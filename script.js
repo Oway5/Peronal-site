@@ -45,10 +45,6 @@ function createWindowElement(id) {
     windowEl.classList.add(`color-${(id % 8) + 1}`);
     windowEl.dataset.windowId = String(id);
 
-    const label = document.createElement('span');
-    label.className = 'window-label';
-    label.textContent = id;
-
     const closeButton = document.createElement('button');
     closeButton.type = 'button';
     closeButton.className = 'window-close';
@@ -65,7 +61,7 @@ function createWindowElement(id) {
         closeWindow(id);
     });
 
-    windowEl.append(label, closeButton);
+    windowEl.append(closeButton);
     workspace.appendChild(windowEl);
 
     return windowEl;
