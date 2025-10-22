@@ -48,7 +48,7 @@ function createWindowElement(id) {
     const closeButton = document.createElement('button');
     closeButton.type = 'button';
     closeButton.className = 'window-close';
-    closeButton.setAttribute('aria-label', 'Close window');
+    closeButton.setAttribute('aria-label', `Close window ${id}`);
     closeButton.title = 'Close window';
     closeButton.innerHTML = `
         <svg viewBox="0 0 10 10" aria-hidden="true" focusable="false">
