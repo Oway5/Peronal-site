@@ -1,20 +1,25 @@
+// Base Window Management Logic
+// Handles window creation, layout, tiling, resizing, and closing
+//
+// PUBLIC API FOR WINDOW CREATION:
+// - addNewWindow() - Creates a new window using automatic target selection
+// - addNewWindowTargeted(targetWindowId, orientation) - Creates a new window by splitting a specific window
+//   * targetWindowId: number|null - The ID of the window to split (null for automatic)
+//   * orientation: 'vertical'|'horizontal'|null - Split direction (null for automatic)
+// - splitWindowVertical(targetWindowId) - Split a specific window vertically
+// - splitWindowHorizontal(targetWindowId) - Split a specific window horizontally
+// - getAllWindowIds() - Returns array of all current window IDs
+// - getWindowLeaf(windowId) - Returns the leaf node for a specific window
+// - closeWindow(windowId) - Closes a specific window
+// - resetToHome() - Closes all windows and creates a fresh first window
+//
+// EXAMPLE USAGE:
+// addNewWindow();                          // Add window with automatic selection
+// addNewWindowTargeted(1, 'vertical');     // Split window 1 vertically
+// splitWindowHorizontal(2);                // Split window 2 horizontally
+// const ids = getAllWindowIds();           // Get all window IDs [1, 2, 3, ...]
+
 const workspace = document.getElementById('workspace');
-const themeSwitcher = document.getElementById('theme-switcher');
-const homeButton = document.getElementById('home-button');
-
-const themes = ['tokyo-night', 'catppuccin', 'gruvbox', 'rose-pine'];
-let currentThemeIndex = 0;
-
-function applyTheme() {
-    document.body.dataset.theme = themes[currentThemeIndex];
-}
-
-themeSwitcher.addEventListener('click', () => {
-    currentThemeIndex = (currentThemeIndex + 1) % themes.length;
-    applyTheme();
-});
-
-applyTheme();
 
 let layoutRoot = null;
 let windowCounter = 0;
@@ -297,21 +302,48 @@ function updateWindowLayout() {
     });
 }
 
-function addNewWindow() {
+/**
+ * Add a new window by splitting a specific target window
+ * @param {number|null} targetWindowId - The ID of the window to split. If null, uses automatic selection.
+ * @param {string|null} orientation - 'vertical' or 'horizontal'. If null, determines automatically.
+ * @returns {number} The ID of the newly created window
+ */
+function addNewWindowTargeted(targetWindowId = null, orientation = null) {
     const id = ++windowCounter;
     const element = createWindowElement(id);
 
     const newLeaf = createLeaf({ id, element });
 
     if (!layoutRoot) {
+        // First window - no splitting needed
         layoutRoot = newLeaf;
     } else {
-        const targetLeaf = selectLeafToSplit();
+        let targetLeaf;
+        
+        if (targetWindowId !== null) {
+            // Split a specific window
+            targetLeaf = windowsById.get(targetWindowId);
+            if (!targetLeaf) {
+                console.warn(`Window ${targetWindowId} not found, using automatic selection`);
+                targetLeaf = selectLeafToSplit();
+            }
+        } else {
+            // Use automatic selection
+            targetLeaf = selectLeafToSplit();
+        }
+
         if (targetLeaf) {
-            const orientation = windowsById.size === 1
-                ? 'vertical'
-                : determineSplitOrientation(targetLeaf);
-            splitLeaf(targetLeaf, newLeaf, orientation);
+            // Determine orientation
+            let splitOrientation;
+            if (orientation !== null && (orientation === 'vertical' || orientation === 'horizontal')) {
+                splitOrientation = orientation;
+            } else if (windowsById.size === 1) {
+                splitOrientation = 'vertical';
+            } else {
+                splitOrientation = determineSplitOrientation(targetLeaf);
+            }
+            
+            splitLeaf(targetLeaf, newLeaf, splitOrientation);
         } else {
             layoutRoot = newLeaf;
         }
@@ -319,6 +351,51 @@ function addNewWindow() {
 
     windowsById.set(id, newLeaf);
     updateWindowLayout();
+    
+    return id;
+}
+
+/**
+ * Add a new window using automatic selection (convenience function)
+ * @returns {number} The ID of the newly created window
+ */
+function addNewWindow() {
+    return addNewWindowTargeted(null, null);
+}
+
+/**
+ * Split a specific window vertically
+ * @param {number} targetWindowId - The ID of the window to split
+ * @returns {number} The ID of the newly created window
+ */
+function splitWindowVertical(targetWindowId) {
+    return addNewWindowTargeted(targetWindowId, 'vertical');
+}
+
+/**
+ * Split a specific window horizontally
+ * @param {number} targetWindowId - The ID of the window to split
+ * @returns {number} The ID of the newly created window
+ */
+function splitWindowHorizontal(targetWindowId) {
+    return addNewWindowTargeted(targetWindowId, 'horizontal');
+}
+
+/**
+ * Get all current window IDs
+ * @returns {number[]} Array of window IDs
+ */
+function getAllWindowIds() {
+    return Array.from(windowsById.keys());
+}
+
+/**
+ * Get the leaf node for a specific window ID
+ * @param {number} windowId - The window ID
+ * @returns {object|null} The leaf node or null if not found
+ */
+function getWindowLeaf(windowId) {
+    return windowsById.get(windowId) || null;
 }
 
 function closeWindow(windowId) {
@@ -491,29 +568,14 @@ function resetToHome() {
     addNewWindow();
 }
 
-homeButton.addEventListener('click', (event) => {
-    event.stopPropagation();
-    resetToHome();
-});
-
-document.addEventListener('click', (event) => {
-    if (!(event.target instanceof Element)) {
-        return;
-    }
-    if (event.target.closest('.window-close') || 
-        event.target.closest('#home-button') || 
-        event.target.closest('#theme-switcher') ||
-        event.target.closest('.resize-handle')) {
-        return;
-    }
-    addNewWindow();
-});
-
+// Initialize
 calculateGapPercentages();
 addNewWindow();
 
+// Watch for workspace size changes
 const resizeObserver = new ResizeObserver(() => {
     calculateGapPercentages();
     updateWindowLayout();
 });
 resizeObserver.observe(workspace);
+

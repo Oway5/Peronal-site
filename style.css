@@ -127,6 +127,35 @@ body {
     transform: scale(0.95);
 }
 
+#add-window-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--fg-primary);
+    opacity: 0.8;
+    transition: opacity 150ms ease-in-out, transform 150ms ease-in-out;
+}
+
+#add-window-button svg {
+    width: 20px;
+    height: 20px;
+}
+
+#add-window-button:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+#add-window-button:active {
+    transform: scale(0.95);
+}
+
 #theme-switcher {
     background: none;
     border: none;
