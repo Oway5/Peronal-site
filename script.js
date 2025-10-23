@@ -25,6 +25,11 @@ const windowsById = new Map();
 const CLOSE_ANIMATION_MS = 180;
 const DEFAULT_SPLIT_RATIO = 0.5;
 
+// Resize state
+let resizingNode = null;
+let resizeStartPos = { x: 0, y: 0 };
+let resizeStartRatio = 0;
+
 function calculateGapPercentages() {
     const style = getComputedStyle(document.documentElement);
     const gapPx = parseFloat(style.getPropertyValue('--gap')) || 0;
@@ -117,6 +122,21 @@ function determineSplitOrientation(leaf) {
     return preferVertical ? 'vertical' : 'horizontal';
 }
 
+function createResizeHandle(splitNode) {
+    const handle = document.createElement('div');
+    handle.className = `resize-handle ${splitNode.orientation}`;
+    handle.dataset.splitNodeId = splitNode.id;
+    
+    handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        startResize(splitNode, e);
+    });
+    
+    workspace.appendChild(handle);
+    return handle;
+}
+
 function splitLeaf(targetLeaf, newLeaf, orientation) {
     const parent = targetLeaf.parent;
     const splitNode = {
@@ -125,8 +145,13 @@ function splitLeaf(targetLeaf, newLeaf, orientation) {
         ratio: DEFAULT_SPLIT_RATIO,
         first: targetLeaf,
         second: newLeaf,
-        parent
+        parent,
+        id: `split-${Date.now()}-${Math.random()}`,
+        resizeHandle: null
     };
+
+    // Create resize handle for this split
+    splitNode.resizeHandle = createResizeHandle(splitNode);
 
     targetLeaf.parent = splitNode;
     targetLeaf.splitCount += 1;
@@ -148,6 +173,11 @@ function removeLeafFromTree(leaf) {
     if (!parent) {
         layoutRoot = null;
         return;
+    }
+
+    // Clean up the parent's resize handle
+    if (parent.resizeHandle && parent.resizeHandle.parentElement === workspace) {
+        workspace.removeChild(parent.resizeHandle);
     }
 
     const sibling = parent.first === leaf ? parent.second : parent.first;
@@ -194,7 +224,7 @@ function applyLayout(node, rect) {
         return;
     }
 
-    const { orientation, ratio, first, second } = node;
+    const { orientation, ratio, first, second, resizeHandle } = node;
 
     if (orientation === 'vertical') {
         const usableWidth = Math.max(rect.width - gapPercentX, 0);
@@ -214,6 +244,15 @@ function applyLayout(node, rect) {
             width: secondWidth,
             height: rect.height
         });
+
+        // Position resize handle
+        if (resizeHandle) {
+            const handleX = rect.x + firstWidth;
+            resizeHandle.style.left = `${handleX}%`;
+            resizeHandle.style.top = `${rect.y}%`;
+            resizeHandle.style.width = `${gapPercentX}%`;
+            resizeHandle.style.height = `${rect.height}%`;
+        }
     } else {
         const usableHeight = Math.max(rect.height - gapPercentY, 0);
         const firstHeight = clampPercentage(usableHeight * ratio);
@@ -232,6 +271,15 @@ function applyLayout(node, rect) {
             width: rect.width,
             height: secondHeight
         });
+
+        // Position resize handle
+        if (resizeHandle) {
+            const handleY = rect.y + firstHeight;
+            resizeHandle.style.left = `${rect.x}%`;
+            resizeHandle.style.top = `${handleY}%`;
+            resizeHandle.style.width = `${rect.width}%`;
+            resizeHandle.style.height = `${gapPercentY}%`;
+        }
     }
 }
 
@@ -308,6 +356,116 @@ function closeWindow(windowId) {
     updateWindowLayout();
 }
 
+function startResize(splitNode, event) {
+    resizingNode = splitNode;
+    resizeStartPos = { x: event.clientX, y: event.clientY };
+    resizeStartRatio = splitNode.ratio;
+    
+    document.body.style.cursor = splitNode.orientation === 'vertical' ? 'ew-resize' : 'ns-resize';
+    document.body.style.userSelect = 'none';
+    
+    document.addEventListener('mousemove', doResize);
+    document.addEventListener('mouseup', stopResize);
+}
+
+function doResize(event) {
+    if (!resizingNode) return;
+    
+    const workspaceRect = workspace.getBoundingClientRect();
+    const deltaX = event.clientX - resizeStartPos.x;
+    const deltaY = event.clientY - resizeStartPos.y;
+    
+    let deltaRatio = 0;
+    
+    if (resizingNode.orientation === 'vertical') {
+        // Calculate the parent rect to get the actual width this split occupies
+        const parentRect = getNodeRect(resizingNode);
+        const actualWidth = workspaceRect.width * (parentRect.width / 100);
+        deltaRatio = deltaX / actualWidth;
+    } else {
+        const parentRect = getNodeRect(resizingNode);
+        const actualHeight = workspaceRect.height * (parentRect.height / 100);
+        deltaRatio = deltaY / actualHeight;
+    }
+    
+    // Apply the new ratio with constraints
+    let newRatio = resizeStartRatio + deltaRatio;
+    newRatio = Math.max(0.1, Math.min(0.9, newRatio)); // Constrain between 10% and 90%
+    
+    resizingNode.ratio = newRatio;
+    updateWindowLayout();
+}
+
+function stopResize() {
+    resizingNode = null;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    
+    document.removeEventListener('mousemove', doResize);
+    document.removeEventListener('mouseup', stopResize);
+}
+
+function getNodeRect(node) {
+    // Walk up the tree to find the rect this node occupies
+    if (!node.parent) {
+        return { x: 0, y: 0, width: 100, height: 100 };
+    }
+    
+    const parentRect = getNodeRect(node.parent);
+    const { orientation, ratio, first } = node.parent;
+    
+    if (node.parent.first === node) {
+        // This is the first child
+        if (orientation === 'vertical') {
+            const usableWidth = Math.max(parentRect.width - gapPercentX, 0);
+            return {
+                x: parentRect.x,
+                y: parentRect.y,
+                width: usableWidth * ratio,
+                height: parentRect.height
+            };
+        } else {
+            const usableHeight = Math.max(parentRect.height - gapPercentY, 0);
+            return {
+                x: parentRect.x,
+                y: parentRect.y,
+                width: parentRect.width,
+                height: usableHeight * ratio
+            };
+        }
+    } else {
+        // This is the second child
+        if (orientation === 'vertical') {
+            const usableWidth = Math.max(parentRect.width - gapPercentX, 0);
+            const firstWidth = usableWidth * ratio;
+            return {
+                x: parentRect.x + firstWidth + gapPercentX,
+                y: parentRect.y,
+                width: usableWidth - firstWidth,
+                height: parentRect.height
+            };
+        } else {
+            const usableHeight = Math.max(parentRect.height - gapPercentY, 0);
+            const firstHeight = usableHeight * ratio;
+            return {
+                x: parentRect.x,
+                y: parentRect.y + firstHeight + gapPercentY,
+                width: parentRect.width,
+                height: usableHeight - firstHeight
+            };
+        }
+    }
+}
+
+function cleanupAllResizeHandles() {
+    const handles = workspace.querySelectorAll('.resize-handle');
+    handles.forEach(handle => {
+        if (handle.parentElement === workspace) {
+            workspace.removeChild(handle);
+        }
+    });
+}
+
 function resetToHome() {
     // Close all windows
     const windowIds = Array.from(windowsById.keys());
@@ -321,6 +479,9 @@ function resetToHome() {
         }
         windowsById.delete(id);
     });
+
+    // Clean up all resize handles
+    cleanupAllResizeHandles();
 
     // Reset layout
     layoutRoot = null;
@@ -339,7 +500,10 @@ document.addEventListener('click', (event) => {
     if (!(event.target instanceof Element)) {
         return;
     }
-    if (event.target.closest('.window-close') || event.target.closest('#home-button') || event.target.closest('#theme-switcher')) {
+    if (event.target.closest('.window-close') || 
+        event.target.closest('#home-button') || 
+        event.target.closest('#theme-switcher') ||
+        event.target.closest('.resize-handle')) {
         return;
     }
     addNewWindow();

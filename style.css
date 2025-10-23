@@ -231,3 +231,25 @@ body {
 .window.color-6 { border-color: var(--accent6); }
 .window.color-7 { border-color: var(--accent7); }
 .window.color-8 { border-color: var(--accent8); }
+
+.resize-handle {
+    position: absolute;
+    z-index: 100;
+    transition: background-color 150ms ease-in-out;
+}
+
+.resize-handle.vertical {
+    cursor: ew-resize;
+}
+
+.resize-handle.horizontal {
+    cursor: ns-resize;
+}
+
+.resize-handle:hover {
+    background-color: rgba(var(--bg-primary-rgb), 0.5);
+}
+
+.resize-handle:active {
+    background-color: rgba(var(--bg-primary-rgb), 0.7);
+}
