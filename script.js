@@ -1,5 +1,6 @@
 const workspace = document.getElementById('workspace');
 const themeSwitcher = document.getElementById('theme-switcher');
+const homeButton = document.getElementById('home-button');
 
 const themes = ['tokyo-night', 'catppuccin', 'gruvbox', 'rose-pine'];
 let currentThemeIndex = 0;
@@ -307,11 +308,38 @@ function closeWindow(windowId) {
     updateWindowLayout();
 }
 
+function resetToHome() {
+    // Close all windows
+    const windowIds = Array.from(windowsById.keys());
+    windowIds.forEach(id => {
+        const leaf = windowsById.get(id);
+        if (leaf && leaf.windowData.element) {
+            const element = leaf.windowData.element;
+            if (element.parentElement === workspace) {
+                workspace.removeChild(element);
+            }
+        }
+        windowsById.delete(id);
+    });
+
+    // Reset layout
+    layoutRoot = null;
+    windowCounter = 0;
+
+    // Add the first window
+    addNewWindow();
+}
+
+homeButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+    resetToHome();
+});
+
 document.addEventListener('click', (event) => {
     if (!(event.target instanceof Element)) {
         return;
     }
-    if (event.target.closest('.window-close')) {
+    if (event.target.closest('.window-close') || event.target.closest('#home-button') || event.target.closest('#theme-switcher')) {
         return;
     }
     addNewWindow();
